@@ -48,7 +48,11 @@ class ProdriskSession(object):
         self._session_id = "session_" + pd.Timestamp("now").strftime("%Y-%m-%d-%H-%M-%S")
 
         # ProdriskSess(<session_id>, <silentConsoleOutput>, <filePath>)
-        self._pb_api = pb.ProdriskCore(self.session_id, self._silent_console)
+        if len(log_file) != 0:
+            self._pb_api = pb.ProdriskCore(self.session_id, self._silent_console, log_file)
+        else:
+            self._pb_api = pb.ProdriskCore(self.session_id, self._silent_console)
+
         self._pb_api.KeepWorkingDirectory(self._keep_working_directory)  # The Prodrisk directory for the current session will be kept. The folder is found under prodrisk.prodrisk_path
 
         self.model = ModelBuilderType(self._pb_api, ignores=['setting'])
