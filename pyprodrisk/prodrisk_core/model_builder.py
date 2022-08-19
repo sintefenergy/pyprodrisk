@@ -1,3 +1,5 @@
+from graphviz import Digraph
+
 from ..prodrisk_core.prodrisk_api import get_attribute_value, get_xyt_attribute, get_attribute_info, \
     set_attribute, get_object_info
 
@@ -43,61 +45,127 @@ class ModelBuilderType(object):
         self._types = {object_type: ModelBuilderObject(self._api, self, object_type, object_names)
                        for object_type, object_names in objects.items()}
 
-    # def build_connection_tree(self, filename='topology', write_file=False):
-    #     types = ['reservoir', 'plant', 'gate', 'junction', 'junction_gate', 'creek_intake', 'tunnel']
-    #     relation_types = ['connection_standard', 'connection_spill', 'connection_bypass']
-    #     object_types = self._shop_api.GetObjectTypesInSystem()
-    #     object_names = self._shop_api.GetObjectNamesInSystem()
-    #     dot = Digraph(comment='SHOP topology')
-    #     connections = []
-    #     networks = []
-    #     subgraphs = []
-    #     for i, (name, object_type) in enumerate(zip(object_names, object_types)):
-    #         if object_type in types:
-    #             shape = 'ellipse'
-    #             bgcolor = 'none'
-    #             subgraph = None
-    #             if object_type == 'plant':
-    #                 shape = 'box'
-    #                 bgcolor = 'rosybrown1'
-    #             elif object_type == 'reservoir':
-    #                 shape = 'invtriangle'
-    #                 bgcolor = 'skyblue'
-    #                 added_to_network = self._shop_api.GetIntValue(object_type, name, "added_to_network")
-    #                 if added_to_network:
-    #                     network_no = self._shop_api.GetIntValue(object_type, name, "network_no")
-    #                     if network_no not in networks:
-    #                         networks.append(network_no)
-    #                         s = Digraph(comment='Network')
-    #                         s.attr(rank='same')
-    #                         subgraphs.append(s)
-    #                     subgraph = subgraphs[networks.index(network_no)]
-    #             elif object_type == 'junction' or object_type == 'junction_gate':
-    #                 shape = 'point'
-    #             elif object_type == 'tunnel':
-    #                 shape = 'box'
-    #                 bgcolor = 'gray83'
-    #             dot.node('{0}_{1}'.format(object_type, name), label=name, shape=shape, style='filled',
-    #                      fillcolor=bgcolor)
-    #             if subgraph is not None:
-    #                 subgraph.node('{0}_{1}'.format(object_type, name), label=name, shape=shape, style='filled',
-    #                               fillcolor=bgcolor)
-    #             for relation in relation_types:
-    #                 for connection in self._shop_api.GetRelations(object_type, name, relation):
-    #                     connections.append((i, connection, relation))
-    #     for connection in connections:
-    #         if (object_types[connection[0]] == 'gate' or object_types[connection[1]] == 'gate') \
-    #                 and connection[2] != 'connection_standard':
-    #             dot.attr('edge', style='dashed')
-    #         else:
-    #             dot.attr('edge', style='solid', arrowtail='none', arrowhead='none')
-    #         dot.edge('{0}_{1}'.format(object_types[connection[0]], object_names[connection[0]]),
-    #                  '{0}_{1}'.format(object_types[connection[1]], object_names[connection[1]]))
-    #     for s in subgraphs:
-    #         dot.subgraph(s)          
-    #     if write_file:
-    #         dot.render(filename + '.gv', view=True)
-    #     return dot
+    def build_connection_tree(self, filename='topology', write_file=False):
+        obj_map = {'module': ['reservoir', 'plant', 'gate']}
+        # relation_types = ['connection_standard', 'connection_spill', 'connection_bypass']
+        object_types = self._api.GetObjectTypesInSystem()
+        object_names = self._api.GetObjectNamesInSystem()
+        dot = Digraph(comment='ProdRisk topology')
+        connections = []
+        subgraphs = []
+
+        # Number of detailed object described by the ProdRisk module object.
+        # Each object need special handling in the hacky implementation below.
+        n_shop_objs = len(obj_map['module'])
+
+        # Mapping used to find module based on external module number.
+        mod_nr_to_int_nr = {}
+        i = 0
+        for (name, object_type) in zip(object_names, object_types):
+            if object_type == 'module':
+                mod = self.module[name]
+                mod_nr_to_int_nr[mod.number.get()] = i
+                i = i + 1
+            elif object_type == 'pump':
+                i = i + 1
+
+        shop_object_types = []
+        shop_object_names = []
+        shop_object_no = 0
+        for i, (name, object_type) in enumerate(zip(object_names, object_types)):
+            if object_type == 'module':
+                shop_object_name = name
+                mod = self.module[name]
+                max_prod = mod.maxProd.get()
+                max_vol = mod.rsvMax.get()
+                topo = mod.topology.get()
+
+                shape = 'invtriangle'
+                bgcolor = 'skyblue'
+                subgraph = None
+
+                for shop_object_type in obj_map[object_type]:
+                    shop_object_types.append(shop_object_type)
+
+                    shape = 'invtriangle'
+                    bgcolor = 'skyblue'
+                    subgraph = None
+
+                    shape = 'ellipse'
+                    bgcolor = 'none'
+                    subgraph = None
+                    if shop_object_type == 'plant':
+                        if max_prod <= 0:
+                            shop_object_names.append(shop_object_name)
+                            shop_object_no = shop_object_no + 1
+                            continue
+                        shape = 'box'
+                        bgcolor = 'rosybrown1'
+                        shop_object_name = mod.plantName.get()
+                        connections.append((shop_object_no - 1, shop_object_no, 'connection_standard'))
+                        if topo[0] > 0:
+                            connections.append(
+                                (shop_object_no, mod_nr_to_int_nr[topo[0]] * n_shop_objs, 'connection_standard'))
+                    elif shop_object_type == 'reservoir' and max_vol > 0:
+                        shape = 'invtriangle'
+                        bgcolor = 'skyblue'
+                        shop_object_name = mod.name.get()
+
+                        if max_prod <= 0 and topo[0] > 0:
+                            connections.append((shop_object_no, mod_nr_to_int_nr[topo[0]] * n_shop_objs, 'connection_standard'))
+
+                    elif shop_object_type == 'gate':
+                        shop_object_name = f"{mod.name.get()}_bypass"
+                        connections.append(
+                            (shop_object_no - 2, shop_object_no, 'connection_bypass'))
+
+                        if topo[1] > 0:
+                            connections.append((shop_object_no, mod_nr_to_int_nr[topo[1]] * n_shop_objs, 'connection_bypass'))
+
+                    shop_object_names.append(shop_object_name)
+
+                    shop_object_no = shop_object_no + 1
+                    dot.node('{0}_{1}'.format(shop_object_type, shop_object_name), label=shop_object_name,
+                             shape=shape, style='filled',
+                             fillcolor=bgcolor)
+
+            elif object_type == 'pump':
+                shop_object_type = 'pump'
+                shape = 'box'
+                bgcolor = 'lightblue'
+
+                pump = self.pump[name]
+                shop_object_name = f"{pump.name.get()}"
+                topo = pump.topology.get()
+
+                for j in range(n_shop_objs):
+                    shop_object_names.append(shop_object_name)
+                    shop_object_types.append(shop_object_type)
+
+                connections.append(
+                    (shop_object_no, mod_nr_to_int_nr[topo[1]]* n_shop_objs, 'connection_standard'))
+                connections.append(
+                    (mod_nr_to_int_nr[topo[2]]* n_shop_objs, shop_object_no, 'connection_standard'))
+
+                shop_object_no = shop_object_no + 3
+                dot.node('{0}_{1}'.format(shop_object_type, shop_object_name), label=shop_object_name,
+                         shape=shape, style='filled',
+                         fillcolor=bgcolor)
+
+
+        for connection in connections:
+            if (shop_object_types[connection[0]] == 'gate' or shop_object_types[connection[1]] == 'gate') \
+                    and connection[2] != 'connection_standard':
+                dot.attr('edge', style='dashed')
+            else:
+                dot.attr('edge', style='solid', arrowtail='none', arrowhead='none')
+            dot.edge('{0}_{1}'.format(shop_object_types[connection[0]], shop_object_names[connection[0]]),
+                     '{0}_{1}'.format(shop_object_types[connection[1]], shop_object_names[connection[1]]))
+        for s in subgraphs:
+            dot.subgraph(s)
+        if write_file:
+            dot.render(filename + '.gv', view=True)
+        return dot
 
 class ModelBuilderObjectIterator(object):
     def __init__(self, model_builder_object):
