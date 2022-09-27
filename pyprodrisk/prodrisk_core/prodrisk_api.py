@@ -7,12 +7,16 @@ def get_attribute_value(api, object_name, object_type, attribute_name, datatype,
     value = None
     if datatype == 'int':
         value = api.GetIntValue(object_type, object_name, attribute_name)
+        if value <= -2**15+1: # largest possible INT_MIN (init value in API core)
+            value = None      # i.e. attribute has not been set
     elif datatype == 'int_array':
         value = list(api.GetIntArray(object_type, object_name, attribute_name))
         if len(value) == 0:
             value = None
     elif datatype == 'double':
         value = api.GetDoubleValue(object_type, object_name, attribute_name)
+        if value <= -1e37: # largest possible -DBL_MAX (init value in API core)
+            value = None
     elif datatype == 'double_array':
         value = list(api.GetDoubleArray(object_type, object_name, attribute_name))
         if len(value) == 0:
