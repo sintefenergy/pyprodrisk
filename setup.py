@@ -8,7 +8,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 
 setup(name='pyprodrisk',
-      version='1.0.0',
+      version='1.1.0',
       author='SINTEF Energy Research',
       description='Python interface to ProdRisk',
       long_description=long_description,
@@ -43,7 +43,7 @@ setup(name='pyprodrisk',
       author_email='support.energy@sintef.no',
       license='MIT',
       python_requires='>=3.7',
-      install_requires=['pandas', 'numpy', 'pybind11'])
+      install_requires=['pandas', 'numpy', 'graphviz', 'pybind11'])
 
 
 
