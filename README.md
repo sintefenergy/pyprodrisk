@@ -47,7 +47,7 @@ It is also possible to use the OSI coin solver with ProdRisk, by setting the att
 
 To use a license file to access your ProdRisk license, the environment variable `LTM_LICENSE_CONTROL_SYSTEM` should be set to TRUE (note: all capical letters!).
 
-The ProdRisk license file, `LTM_license.dat`, must always be located in the directory specified by the environment variable `LTM_LICENSE_PATH`. 
+The ProdRisk license file, `LTM_License.dat`, must always be located in the directory specified by the environment variable `LTM_LICENSE_PATH`. 
 The `LTM_LICENSE_PATH` can be added as a persistent environment variable in the regular ways, or it can be set by pyprodrisk on a session basis. 
 If the keyword argument `license_path` is specified when creating an instance of the ProdriskSession class (see step 4), the environment variables 
 `LTM_LICENSE_CONTROL_SYSTEM` is set to TRUE, and `LTM_LICENSE_PATH` and is overridden in the local environment of the executing process. 
